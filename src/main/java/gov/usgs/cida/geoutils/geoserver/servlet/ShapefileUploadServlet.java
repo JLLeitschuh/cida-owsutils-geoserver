@@ -17,9 +17,14 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.*;
@@ -38,6 +43,8 @@ import org.apache.http.entity.AbstractHttpEntity;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
+import org.geotools.referencing.operation.projection.ProjectionException;
+import org.opengis.referencing.FactoryException;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
@@ -182,11 +189,11 @@ public class ShapefileUploadServlet extends HttpServlet {
         // "reproject" (default), "force", "none"
         ProjectionPolicy projectionPolicy;
 
-        Map<String, String> responseMap = new HashMap<String, String>();
+        Map<String, String> responseMap = new HashMap<>();
 
         RequestResponse.ResponseType responseType = RequestResponse.ResponseType.XML;
         String responseEncoding = request.getParameter("response.encoding");
-        if (StringUtils.isBlank(responseEncoding) || responseEncoding.toLowerCase().contains("json")) {
+        if (StringUtils.isBlank(responseEncoding) || responseEncoding.toLowerCase(Locale.getDefault()).contains("json")) {
             responseType = RequestResponse.ResponseType.JSON;
         }
         LOG.debug("Response type set to " + responseType.toString());
@@ -235,7 +242,7 @@ public class ShapefileUploadServlet extends HttpServlet {
         }
 
         String tempDir = System.getProperty("java.io.tmpdir");
-        File shapeZipFile = new File(tempDir + File.separator + filename);
+        File shapeZipFile = new File(tempDir + File.separator + filename + new Date().getTime());
         LOG.debug("Temporary file set to " + shapeZipFile.getPath());
 
         String layerName = request.getParameter("layer");
@@ -342,9 +349,9 @@ public class ShapefileUploadServlet extends HttpServlet {
 		
         try {
             srsName = ProjectionUtils.getProjectionFromShapefileZip(shapeZipFile, false);
-        } catch (Exception ex) {
+        } catch (IOException | FactoryException | ProjectionException ex) {
             responseMap.put("warning", "WARNING: Could not find EPSG code for prj definition. The geographic coordinate system '"+srsName+"' will be used ");
-        }
+		}
 
         String importResponse;
         try {
@@ -361,7 +368,7 @@ public class ShapefileUploadServlet extends HttpServlet {
 
             importResponse = importUsingWPS(workspaceName, storeName, layerName, shapeZipFile.toURI(), srsName, projectionPolicy, null);
             
-            if (importResponse.toLowerCase().contains("exception")) {
+            if (importResponse.toLowerCase(Locale.getDefault()).contains("exception")) {
                 String error = parseWPSErrorText(importResponse);
                 LOG.debug("Shapefile could not be imported successfully");
                 responseMap.put("error", error);
@@ -374,7 +381,7 @@ public class ShapefileUploadServlet extends HttpServlet {
                 RequestResponse.sendSuccessResponse(response, responseMap, responseType);
             }
             
-        } catch (Exception ex) {
+        } catch (IllegalArgumentException | IOException | ParserConfigurationException | SAXException ex) {
             LOG.warn(ex.getMessage());
             responseMap.put("error", "Unable to upload file");
             responseMap.put("exception", ex.getMessage());
@@ -396,6 +403,7 @@ public class ShapefileUploadServlet extends HttpServlet {
 	 * 
 	 * @param shapefileZip
 	 * @return A reference to the updated shapefile zip.
+	 * @throws java.io.IOException
 	 */
 	protected File cleanUploadedFile(File shapefileZip) throws IOException {
 		FileHelper.flattenZipFile(shapefileZip.getPath());
@@ -411,7 +419,7 @@ public class ShapefileUploadServlet extends HttpServlet {
 	 * If the file is valid, null is returned.  If invalid, an Exception is returned.
 	 * 
 	 * @param shapefileZip
-	 * @return An Exception if invalid, null otherwise.
+	 * @throws java.lang.Exception
 	 */
 	protected void validateUploadedFile(File shapefileZip) throws Exception {
 		FileHelper.validateShapefileZip(shapefileZip);
@@ -427,6 +435,7 @@ public class ShapefileUploadServlet extends HttpServlet {
 	 * 
 	 * @param shapefileZip
 	 * @return A reference to the updated shapefile zip.
+	 * @throws java.lang.Exception
 	 */
 	protected File transformUploadedFile(File shapefileZip) throws Exception {
 		return shapefileZip;
@@ -554,7 +563,7 @@ public class ShapefileUploadServlet extends HttpServlet {
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         dbFactory.setValidating(false);
         DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
-        Document doc = dBuilder.parse(new ByteArrayInputStream(xml.getBytes()));
+        Document doc = dBuilder.parse(new ByteArrayInputStream(xml.getBytes(Charset.defaultCharset())));
         doc.getDocumentElement().normalize();
 
         JXPathContext ctx = JXPathContext.newContext(doc);
