@@ -78,10 +78,6 @@
 			<url>http://download.osgeo.org/webdav/geotools/</url>
 		</repository>
 		<repository>
-			<id>opengeo</id>
-			<url>http://repo.boundlessgeo.com/main/</url>
-		</repository>
-		<repository>
 			<id>geosolutions</id>
 			<name>GeoSolutions</name>
 			<url>http://maven.geo-solutions.it/</url>
