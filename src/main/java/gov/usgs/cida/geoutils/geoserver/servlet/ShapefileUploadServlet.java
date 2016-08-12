@@ -465,7 +465,7 @@ public class ShapefileUploadServlet extends HttpServlet {
                     + "<wps:Input>"
                     + "<ows:Identifier>features</ows:Identifier>"
                     + "<wps:Data>"
-                    + "<wps:ComplexData mimeType=\"application/zip\"><![CDATA[").getBytes());
+                    + "<wps:ComplexData mimeType=\"application/zip\" encoding=\"base64\"><![CDATA[").getBytes());
             IOUtils.copy(uploadedInputStream, new Base64OutputStream(wpsRequestOutputStream, true, 0, null));
             wpsRequestOutputStream.write(new String(
                     "]]></wps:ComplexData>"
