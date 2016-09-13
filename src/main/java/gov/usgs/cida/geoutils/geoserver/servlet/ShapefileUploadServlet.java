@@ -372,10 +372,18 @@ public class ShapefileUploadServlet extends HttpServlet {
                 RequestResponse.sendErrorResponse(response, responseMap, responseType);
             } else {
                 LOG.debug("Shapefile has been imported successfully");
-                responseMap.put("name", importResponse);
-                responseMap.put("workspace", workspaceName);
-                responseMap.put("store", storeName);
-                RequestResponse.sendSuccessResponse(response, responseMap, responseType);
+                boolean recalculationSuccess = gsPublisher.recalculateFeatureTypeBBox(workspaceName, storeName, layerName, GeoServerRESTPublisher.BBoxRecalculationMode.NATIVE_AND_LAT_LON_BBOX);
+                if(!recalculationSuccess){
+                    String errMsg = "Failed to recalculate bounding box";
+                    LOG.debug(errMsg);
+                    responseMap.put("error", errMsg);
+                    RequestResponse.sendErrorResponse(response, responseMap, responseType);
+                } else {
+                    responseMap.put("name", importResponse);
+                    responseMap.put("workspace", workspaceName);
+                    responseMap.put("store", storeName);
+                    RequestResponse.sendSuccessResponse(response, responseMap, responseType);
+                }
             }
             
         } catch (IllegalArgumentException | IOException | ParserConfigurationException | SAXException ex) {
