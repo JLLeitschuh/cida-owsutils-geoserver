@@ -4,6 +4,9 @@ import static gov.usgs.cida.geoutils.geoserver.servlet.GeoServerAwareServlet.def
 import gov.usgs.cida.owsutils.commons.communication.RequestResponse;
 import it.geosolutions.geoserver.rest.GeoServerRESTPublisher;
 import java.io.FileNotFoundException;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -70,7 +73,47 @@ public class BoundingBoxRecalculationServlet extends GeoServerAwareServlet {
         responseMap.put("workspace", workspaceName);
         responseMap.put("store", storeName);
         
-        boolean success = gsRestManager.getPublisher().recalculateFeatureTypeBBox(workspaceName, storeName, layerName, GeoServerRESTPublisher.BBoxRecalculationMode.NATIVE_AND_LAT_LON_BBOX, true);
+        GeoServerRESTPublisher publisher;
+        publisher = (GeoServerRESTPublisher) Proxy.newProxyInstance(
+                this.getClass().getClassLoader(),
+                new Class[]{GeoServerRESTPublisher.class},
+                new InvocationHandler() {
+                    @Override
+                    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                        if(method.getName().equals("recalculateFeatureTypeBBox")){
+                            return this.recalculateFeatureTypeBBox((String)args[0], (String)args[1], (String)args[2], (BBoxRecalculationMode)args[3], (boolean)args[4]);
+                            
+                        } else {
+                            return method.invoke(proxy, args);
+                        }
+                    }
+                    /**
+                     * Recalculate a bounding box for a feature type
+                     *
+                     * @param workspace
+                     * @param storeName
+                     * @param layerName
+                     * @param calculationMode
+                     * @param enabled
+                     * @return true if successful, false otherwise
+                     */
+                    public boolean recalculateFeatureTypeBBox(String workspace, String storeName, String layerName, BBoxRecalculationMode calculationMode, boolean enabled) {
+                        String baseUrl = geoserverEndpoint + "/rest/workspaces/" + workspace + "/"
+                                + "datastores/" + storeName + "/"
+                                + "featuretypes/"
+                                + layerName + ".xml" ;
+                        
+                        String sUrl = baseUrl + "?recalculate=" + calculationMode.getParamValue();
+                        LOG.debug("Constructed the following url for bounding box recalculation: " + sUrl);
+                        String xmlElementName = "featureType";
+                        String body = "<" + xmlElementName +"><name>" + layerName + "</name>" + 
+                                "<enabled>" + enabled + "</enabled></" + xmlElementName + ">";
+                        
+                        return false;
+                    }
+                });
+        
+        boolean success = publisher.recalculateFeatureTypeBBox(workspaceName, storeName, layerName, BBoxRecalculationMode.NATIVE_AND_LAT_LON_BBOX, true);
         if(success) {
             responseMap.put("success", "bounding box recalcuated");
             RequestResponse.sendSuccessResponse(response, responseMap, responseType);
